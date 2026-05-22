@@ -589,47 +589,47 @@ class InstallerWindow(Adw.ApplicationWindow):
             self._set_step("network-vpn-symbolic",
                            "ProtonVPN CLI", "Download repository ufficiale…")
             try:
+                # ── Procedura ufficiale ProtonVPN per ogni distro ──────────────
+                # https://protonvpn.com/support/linux-cli/
                 if DISTRO == "debian":
-                    import re as _re
-                    # Scopre automaticamente l'URL del .deb dall'indice del repo
-                    deb_url = None
-                    try:
-                        _pkg_req = urllib.request.Request(
-                            "https://repo.protonvpn.com/debian/dists/stable/"
-                            "main/binary-all/Packages",
-                            headers={"User-Agent": "StreamLink-Installer"})
-                        with urllib.request.urlopen(_pkg_req, timeout=10) as _rp:
-                            _pkgs = _rp.read().decode(errors="replace")
-                        _m = _re.search(
-                            r"Filename:\s+(.*?protonvpn-stable-release[^\s]+\.deb)",
-                            _pkgs)
-                        if _m:
-                            deb_url = ("https://repo.protonvpn.com/debian/"
-                                       + _m.group(1).strip())
-                    except Exception:
-                        pass
-                    if not deb_url:
-                        # URL di fallback aggiornato
-                        deb_url = ("https://repo.protonvpn.com/debian/dists/stable/"
-                                   "main/binary-all/protonvpn-stable-release_1.0.6-2_all.deb")
+                    # 1) Scarica il .deb che aggiunge il repo ProtonVPN (con wget,
+                    #    come indicato dalla guida ufficiale — urllib viene bloccato)
                     tmp = "/tmp/protonvpn-stable-release.deb"
-                    urllib.request.urlretrieve(deb_url, tmp)
+                    deb_url = ("https://repo.protonvpn.com/debian/dists/stable/"
+                               "main/binary-all/protonvpn-stable-release_1.0.8_all.deb")
+                    r = subprocess.run(
+                        ["wget", "-q", "-O", tmp, deb_url],
+                        capture_output=True, text=True)
+                    if r.returncode != 0:
+                        raise Exception(f"Download repo: {r.stderr.strip()}")
+                    # 2) Installa il pacchetto repo + aggiorna gli indici
                     sudo_run(["dpkg", "-i", tmp])
                     sudo_run(["apt-get", "update", "-qq"])
-                    sudo_run(["apt-get", "install", "-y", "protonvpn-cli"])
+                    # 3) Installa ProtonVPN CLI
+                    sudo_run(["apt-get", "install", "-y", "proton-vpn-cli"])
                     os.unlink(tmp)
+
                 elif DISTRO == "fedora":
+                    # Legge la versione Fedora dinamicamente (es. 40, 41, 44…)
                     import re as _re
-                    ver = _re.search(r'\d+', open("/etc/fedora-release").read()).group()
-                    tmp = "/tmp/protonvpn-stable-release.rpm"
-                    urllib.request.urlretrieve(
+                    ver = _re.search(
+                        r'\d+', open("/etc/fedora-release").read()).group()
+                    rpm_url = (
                         f"https://repo.protonvpn.com/fedora-{ver}-stable/"
-                        "protonvpn-stable-release/protonvpn-stable-release-1.0.4-1.noarch.rpm",
-                        tmp)
+                        "protonvpn-stable-release/"
+                        "protonvpn-stable-release-1.0.4-1.noarch.rpm")
+                    tmp = "/tmp/protonvpn-stable-release.rpm"
+                    r = subprocess.run(
+                        ["wget", "-q", "-O", tmp, rpm_url],
+                        capture_output=True, text=True)
+                    if r.returncode != 0:
+                        raise Exception(f"Download repo: {r.stderr.strip()}")
                     sudo_run(["dnf", "install", "-y", tmp])
+                    sudo_run(["dnf", "check-update", "--refresh"])
                     sudo_run(["dnf", "install", "-y", "proton-vpn-cli"])
                     os.unlink(tmp)
-                else:
+
+                else:  # Arch — il pacchetto è nei repo ufficiali
                     sudo_run(["pacman", "-S", "--noconfirm", "proton-vpn-cli"])
 
                 if not cmd_exists("protonvpn"):
