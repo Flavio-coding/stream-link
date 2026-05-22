@@ -590,13 +590,33 @@ class InstallerWindow(Adw.ApplicationWindow):
                            "ProtonVPN CLI", "Download repository ufficiale…")
             try:
                 if DISTRO == "debian":
+                    import re as _re
+                    # Scopre automaticamente l'URL del .deb dall'indice del repo
+                    deb_url = None
+                    try:
+                        _pkg_req = urllib.request.Request(
+                            "https://repo.protonvpn.com/debian/dists/stable/"
+                            "main/binary-all/Packages",
+                            headers={"User-Agent": "StreamLink-Installer"})
+                        with urllib.request.urlopen(_pkg_req, timeout=10) as _rp:
+                            _pkgs = _rp.read().decode(errors="replace")
+                        _m = _re.search(
+                            r"Filename:\s+(.*?protonvpn-stable-release[^\s]+\.deb)",
+                            _pkgs)
+                        if _m:
+                            deb_url = ("https://repo.protonvpn.com/debian/"
+                                       + _m.group(1).strip())
+                    except Exception:
+                        pass
+                    if not deb_url:
+                        # URL di fallback aggiornato
+                        deb_url = ("https://repo.protonvpn.com/debian/dists/stable/"
+                                   "main/binary-all/protonvpn-stable-release_1.0.6-2_all.deb")
                     tmp = "/tmp/protonvpn-stable-release.deb"
-                    urllib.request.urlretrieve(
-                        "https://repo.protonvpn.com/debian/dists/stable/main/"
-                        "binary-all/protonvpn-stable-release_1.0.8_all.deb", tmp)
+                    urllib.request.urlretrieve(deb_url, tmp)
                     sudo_run(["dpkg", "-i", tmp])
                     sudo_run(["apt-get", "update", "-qq"])
-                    sudo_run(["apt-get", "install", "-y", "proton-vpn-cli"])
+                    sudo_run(["apt-get", "install", "-y", "protonvpn-cli"])
                     os.unlink(tmp)
                 elif DISTRO == "fedora":
                     import re as _re
